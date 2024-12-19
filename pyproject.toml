@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "PyLMSTools"
+version = "0.1.0"
+description = "A Python package for interacting with a Lyrion/Logitech Media Server (LMS) and clients"
+keywords = ["api", "LMS", "Lyrion", "Logitech Media Server"]
+authors = [
+    { name = "ryanlidster", email = "your.email@example.com" },
+]
+readme = {file = "README.txt", content-type = "text/markdown"}
+license = { file = "LICENSE.txt" }
+requires-python = ">=3.6"
+dependencies = [
+    "requests",
+]
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+]
+
+[project.urls]
+Homepage = "https://github.com/ryanlidster/PyLMSTools"
+Repository = "https://github.com/ryanlidster/PyLMSTools.git"
+Changelog = "https://github.com/ryanlidster/PyLMSTools/blob/master/CHANGELOG.md"
+
