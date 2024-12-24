@@ -4,12 +4,8 @@
 #
 # This set of tools was inspired by the PyLMS library.
 
-try:
-    from .tags import LMSTags
-    from .utils import LMSUtils
-except:
-    from tags import LMSTags
-    from utils import LMSUtils
+from pylmstools.tags import LMSTags
+from pylmstools.utils import LMSUtils
 
 
 DETAILED_TAGS = [LMSTags.ARTIST,

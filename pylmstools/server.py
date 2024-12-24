@@ -4,10 +4,7 @@ This code uses the JSON interface.
 """
 import urllib.request
 import json
-try:
-    from .player import LMSPlayer
-except:
-    from player import LMSPlayer
+from pylmstools.player import LMSPlayer
 
 DEBUG=False
 

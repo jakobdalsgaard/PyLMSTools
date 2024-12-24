@@ -1,10 +1,6 @@
 import json
 
-from .menuitems import (NextMenuItem,
-                       PlaylistMenuItem,
-                       SearchMenuItem,
-                       AudioMenuItem)
-
+from pylmstools.menuitems import NextMenuItem, PlaylistMenuItem, SearchMenuItem, AudioMenuItem
 
 class LMSMenuException(Exception):
     """Simple exception class for handling errors in the LMSMenuHandler."""
