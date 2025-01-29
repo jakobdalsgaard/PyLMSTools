@@ -47,6 +47,10 @@ def lms_request(params_list: list, server_url='http://127.0.0.1:9000/jsonrpc.js'
 
 url = sys.argv[1]
 
+payload = ["", ["serverstatus",0]]
+resp = lms_request(params_list=payload, server_url=url)
+pprint.pprint(resp)
+
 # Get the number of players connected to the server
 payload = ["", ["player", "count", "?"]]
 resp = lms_request(params_list=payload, server_url=url)
@@ -55,6 +59,7 @@ print(f"{player_count=}")
 
 # Get connected players' detail in a single call
 payload = ["", ["players", 0, int(player_count)]]
+payload = ["", ["players", 0]]
 resp = lms_request(params_list=payload, server_url=url)
 pprint.pprint(resp)
 

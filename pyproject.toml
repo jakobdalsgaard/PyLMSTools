@@ -36,3 +36,5 @@ Homepage = "https://github.com/ryanlidster/PyLMSTools"
 Repository = "https://github.com/ryanlidster/PyLMSTools.git"
 Changelog = "https://github.com/ryanlidster/PyLMSTools/blob/master/CHANGELOG.md"
 
+[tool.setuptools.packages.find]
+include = ["pylmstools", "examples"]
