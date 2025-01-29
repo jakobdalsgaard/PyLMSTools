@@ -1,18 +1,27 @@
 """
 Simple python class definitions for interacting with Logitech Media Server.
-This code uses the JSON interface.
+This code uses the JSON RPC interface.
 """
-import urllib.request
-import json
+import logging
+from typing import List
+import requests
 from pylmstools.player import LMSPlayer
 
-DEBUG=False
+
+LOG = logging.getLogger()
 
 class LMSConnectionError(Exception):
-    pass
+    """
+    Exception raised when a connection to the LMS server cannot be made
+    """
+
+class LMSServerError(Exception):
+    """
+    Exception raised when a server request fails
+    """
 
 
-class LMSServer(object):
+class LMSServer():
     """
     :type host: str
     :param host: address of LMS server (default "localhost")
@@ -20,7 +29,8 @@ class LMSServer(object):
     :param port: port for the web interface (default 9000)
 
     Class for Logitech Media Server.
-    Provides access via JSON interface. As the class uses the JSON interface, no active connections are maintained.
+    Provides access via JSON interface. As the class uses the JSON interface,
+    no active connections are maintained.
 
     """
 
@@ -29,45 +39,45 @@ class LMSServer(object):
         self.port = port
         self._version = None
         self.id = 1
-        self.web = "http://{h}:{p}/".format(h=host, p=port)
-        self.url = "http://{h}:{p}/jsonrpc.js".format(h=host, p=port)
+        self.web = f"http://{host}:{port}/"
+        self.url = f"http://{host}:{port}/jsonrpc.js"
+        self.players = None
 
     def request(self, player="", params=None):
         """
         :type player: (str)
-        :param player: MAC address of a connected player. Alternatively, "-" can be used for server level requests.
+        :param player: MAC address of a connected player. Alternatively, 
+                       "-" can be used for server level requests.
         :type params: (str, list)
         :param params: Request command
 
         """
-        if DEBUG: print("server request: ",self.url,player,params)
+        if params is None:
+            params = []
 
-        if type(params) == str:
-            params = params.split()
+        LOG.debug('server request: %s %s %s', self.url, player, params)
+
         cmd = [player, params]
 
-        data = {"id": self.id,
+        payload = {"id": self.id,
                 "method": "slim.request",
                 "params": cmd}
-        # So now we convert the dictionary data to a string
-        headers = {'Content-Type':'application/json'}
-        params = json.dumps(data, sort_keys=True, indent=4).encode('utf-8')
-        req    = urllib.request.Request(self.url,params,headers)
-        #req.add_header('Content-Type', 'application/json')
+
+        LOG.debug('Request payload: %s', payload)
         try:
-            resp = urllib.request.urlopen(req)
-            response = json.loads(resp.read().decode('utf-8'))
-            self.id += 1
-            return response['result']
+            response = requests.post(url=self.url, json=payload, timeout=10)
+        except requests.exceptions.ConnectTimeout as err:
+            raise LMSConnectionError("Could not connect to server.") from err
+        except requests.exceptions.ConnectionError as err:
+            raise LMSServerError("Null response - likely problem with request") from err
 
-        except urllib.error.URLError:
-            raise LMSConnectionError("Could not connect to server.")
+        if response.status_code == 200:
+            return response.json()['result']
 
-        except:
-            print("Erreur LMS server request")
-            return None
+        LOG.error("%s - %s", response.status_code, response.text)
+        return None
 
-    def get_players(self):
+    def get_players(self) -> List[LMSPlayer]:
         """
         :rtype: list
         :returns: list of LMSPlayer instances
@@ -88,7 +98,7 @@ class LMSServer(object):
             self.players.append(player)
         return self.players
 
-    def get_player_count(self):
+    def get_player_count(self) -> int:
         """
         :rtype: int
         :returns: number of connected players
@@ -99,14 +109,11 @@ class LMSServer(object):
             3
 
         """
-        try:
-            count = self.request(params="player count ?")["_count"]
-        except:
-            count = 0
+        count = self.request(params=["player", "count", "?"])["_count"]
 
         return count
 
-    def get_sync_groups(self):
+    def get_sync_groups(self) -> List:
         """
         :rtype: list
         :returns: list of syncgroups. Each group is a list of references of the members.
@@ -118,10 +125,10 @@ class LMSServer(object):
 
         """
         groups = self.request(params="syncgroups ?")
-        syncgroups = [x.get("sync_members","").split(",") for x in groups.get("syncgroups_loop",dict())]
+        syncgroups = [x.get("sync_members","").split(",") for x in groups.get("syncgroups_loop", {})]
         return syncgroups
 
-    def show_players_sync_status(self):
+    def show_players_sync_status(self) -> dict:
         """
         :rtype: dict
         :returns: dictionary (see attributes below)
@@ -186,7 +193,7 @@ class LMSServer(object):
         self.request(player=master, params=["sync", slave])
 
 
-    def ping(self):
+    def ping(self) -> bool:
         """
         :rtype: bool
         :returns: True if server is alive, False if server is unreachable
@@ -199,15 +206,18 @@ class LMSServer(object):
             True
 
         """
-
+        # 'ping' is not a valid interface command so a 'null' result will
+        # indicate that the server is reachable
         try:
-            self.request(params="ping")
-            return True
+            self.request(params=["ping"])
+        except LMSServerError:
+            pass
         except LMSConnectionError:
             return False
+        return True
 
     @property
-    def version(self):
+    def version(self) -> str:
         """
         :attr version: Version number of server Software
 
@@ -217,35 +227,33 @@ class LMSServer(object):
             u'7.9.0'
         """
         if self._version is None:
-            self._version = self.request(params="version ?")["_version"]
+            self._version = self.request(params=["version", "?"])["_version"]
         return self._version
 
     def rescan(self, mode='fast'):
         """
         :type mode: str
-        :param mode: Mode can be 'fast' for update changes on library, 'full' for complete library scan and 'playlists' for playlists scan only
+        :param mode: Mode can be 'fast' for update changes on library, 'full' for complete
+                     library scan and 'playlists' for playlists scan only
 
         Trigger rescan of the media library.
         """
-        is_scanning = True
-        try:
-            is_scanning = bool(self.request("rescan ?")["_rescan"])
-        except:
-            pass
+
+        is_scanning = bool(self.request(["rescan", "?"])["_rescan"])
 
         if not is_scanning:
             if mode == 'fast':
-                return self.request(params="rescan")
-            elif mode == 'full':
-                return self.request(params="wipecache")
-            elif mode == 'playlists':
-                return self.request(params="rescan playlists")
-        else:
-            return ""
+                return self.request(params=["rescan"])
+            if mode == 'full':
+                return self.request(params=["wipecache"])
+            if mode == 'playlists':
+                return self.request(params=["rescan", "playlists"])
+
+        return ""
 
     @property
     def rescanprogress(self):
         """
         :attr rescanprogress: current rescan progress
         """
-        return self.request(params="rescanprogress")["_rescan"]
+        return self.request(params=["rescanprogress"])["_rescan"]

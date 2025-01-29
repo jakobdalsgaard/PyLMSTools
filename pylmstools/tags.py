@@ -1,4 +1,8 @@
-class LMSTags(object):
+"""
+LMS search query tags
+"""
+
+class LMSTags():
     """
     :const ARTIST: Artist name.
     :const ALBUM_ID: Album ID. Only if known.

@@ -1,12 +1,12 @@
-# LMSTools: A suite of python tools for use with a Logitech Media Server
-#
-# by elParaguayo
-#
-# This set of tools was inspired by the PyLMS library.
+"""
+Tools for interacting with LMS player (client) devices
+"""
 
+import logging
+from typing import List
 from pylmstools.tags import LMSTags
-from pylmstools.utils import LMSUtils
 
+LOG = logging.getLogger()
 
 DETAILED_TAGS = [LMSTags.ARTIST,
                  LMSTags.COVERID,
@@ -17,15 +17,19 @@ DETAILED_TAGS = [LMSTags.ARTIST,
                  LMSTags.REMOTE,
                  LMSTags.ARTWORK_TRACK_ID]
 
+class LMSPlayerError(Exception):
+    """
+    Exception when a player request/action fails
+    """
 
-class LMSPlayer(LMSUtils):
+class LMSPlayer():
     """
     The LMSPlayer class represents an individual squeeze player connected to
     your Logitech Media Server.
 
     Instances of this class are generated from the LMSServer object and it is
     not expected that you would create an instance directly. However, it is
-    posible to create instances directly:
+    possible to create instances directly:
 
     .. code-block:: python
 
@@ -63,16 +67,17 @@ class LMSPlayer(LMSUtils):
         """
         Create an instance of LMSPlayer when the MAC address of the player is unknown.
 
-        This class method uses the index of the player (as registered on the server) to identify the player.
+        This class method uses the index of the player (as registered on the server)
+        to identify the player.
 
         :rtype: LMSPlayer
         :returns: Instance of squeezeplayer
         """
-        ref = server.request(params="player id {} ?".format(index))["_id"]
+        ref = server.request(params=["player",  "id",  index, "?"])["_id"]
         return cls(ref, server)
 
     def __repr__(self):
-        return "LMSPlayer: {} ({})".format(self.name, self.ref)
+        return f"LMSPlayer: {self.name} ({self.ref})"
 
     def __eq__(self, other):
         # Useful to have a method to test for equality.
@@ -81,10 +86,9 @@ class LMSPlayer(LMSUtils):
         try:
             return self.ref == other.ref
         except AttributeError:
-            if type(other) == str:
+            if isinstance(other) == str:
                 return self.ref.lower() == other.lower()
-            else:
-                return False
+            return False
 
     def update(self):
         """
@@ -104,7 +108,7 @@ class LMSPlayer(LMSUtils):
         :returns: JSON response received from server
 
         Send the request to the server."""
-        return self.server.request(self.ref, command)
+        return self.server.request(player=self.ref, params=command.split(' '))
 
     def parse_request(self, command, key):
         """
@@ -156,7 +160,7 @@ class LMSPlayer(LMSUtils):
         """Unmute player"""
         self.muted = False
 
-    def seek_to(self, seconds):
+    def seek_to(self, seconds: float):
         """
         :type seconds: int, float
         :param seconds: position (in seconds) that player should seek to
@@ -164,7 +168,7 @@ class LMSPlayer(LMSUtils):
         Move player to specified position in current playlist item"""
         try:
             seconds = float(seconds)
-            self.request("time {}".format(seconds))
+            self.request(f"time {seconds}")
         except TypeError:
             pass
 
@@ -177,7 +181,7 @@ class LMSPlayer(LMSUtils):
         """
         try:
             seconds = int(seconds)
-            self.request("time +{}".format(seconds))
+            self.request(f"time +{seconds}")
         except TypeError:
             pass
 
@@ -190,12 +194,12 @@ class LMSPlayer(LMSUtils):
         """
         try:
             seconds = int(seconds)
-            self.request("time -{}".format(seconds))
+            self.request(f"time -{seconds}")
         except TypeError:
             pass
 
     @property
-    def name(self):
+    def name(self) -> str:
         """
         Player name.
 
@@ -224,14 +228,12 @@ class LMSPlayer(LMSUtils):
         """
         Set the player name.
         """
-        try:
-            self.request("name {}".format(name))
-            self._name = name
-        except:
-            pass
+        self.request(f"name {name}")
+        self._name = name
+
 
     @property
-    def model(self):
+    def model(self) -> str:
         """
         :rtype: str, unicode
         :returns: model name of the current player.
@@ -239,37 +241,36 @@ class LMSPlayer(LMSUtils):
         return self._model
 
     @property
-    def mode(self):
+    def mode(self) -> str:
         """
         :rtype: str, unicode
-        :returns: curent mode (e.g. "play", "pause")
+        :returns: current mode (e.g. "play", "pause")
         """
         return self.parse_request("mode ?", "_mode")
 
     @property
-    def muted(self):
+    def muted(self) -> bool:
         """
         Muting
 
         :getter: retrieve current muting status
         :rtype: bool
         :returns: True if muted, False if not.
-
-        :setter: set muting status (True = muted)
-
         """
         muted = self.parse_request("mixer muting ?", "_muting")
         if muted is None:
             return False
-        else:
-            return muted == 1
+
+        return muted == 1
 
     @muted.setter
     def muted(self, muting):
-        try:
-            self.request("mixer muting {}".format(int(muting)))
-        except:
-            pass
+        """
+        Muting
+
+        :setter: set muting status (True = muted)
+        """
+        self.request(f"mixer muting {int(muting)}")
 
     @property
     def wifi_signal_strength(self):
@@ -280,7 +281,15 @@ class LMSPlayer(LMSUtils):
         return self.parse_request("signalstrength ?", "_signalstrength")
 
     @property
-    def track_artist(self):
+    def current_title(self) -> str:
+        """
+        :rtype: unicode, str
+        :returns: name of the current playing track/stream
+        """
+        return self.parse_request("current_title ?", "_current_title")
+
+    @property
+    def track_artist(self) -> str:
         """
         :rtype: unicode, str
         :returns: name of artist for current playlist item
@@ -294,7 +303,7 @@ class LMSPlayer(LMSUtils):
         return self.parse_request("artist ?", "_artist")
 
     @property
-    def track_album(self):
+    def track_album(self) -> str:
         """
         :rtype: unicode, str
         :returns: name of album for current playlist item
@@ -308,7 +317,7 @@ class LMSPlayer(LMSUtils):
         return self.parse_request("album ?", "_album")
 
     @property
-    def track_title(self):
+    def track_title(self) -> str:
         """
         :rtype: unicode, str
         :returns: name of track for current playlist item
@@ -322,7 +331,7 @@ class LMSPlayer(LMSUtils):
         return self.parse_request("title ?", "_title")
 
     @property
-    def track_duration(self):
+    def track_duration(self) -> float:
         """
         :rtype: float
         :returns: duration of track in seconds
@@ -333,10 +342,14 @@ class LMSPlayer(LMSUtils):
             384.809
 
         """
-        return float(self.parse_request("duration ?", "_duration"))
+        try:
+            duration = float(self.parse_request("duration ?", "_duration"))
+        except TypeError:
+            duration = 0.0
+        return duration
 
     @property
-    def track_elapsed_and_duration(self):
+    def track_elapsed_and_duration(self) -> tuple:
         """
         :rtype: tuple (float, float)
         :returns: tuple of elapsed time and track duration
@@ -347,16 +360,12 @@ class LMSPlayer(LMSUtils):
             (4.86446976280212, 384.809)
 
         """
-        try:
-            duration = self.track_duration
-            elapsed = self.time_elapsed
-        except:
-            duration = 0.0
-            elapsed = 0.0
+        duration = self.track_duration
+        elapsed = self.time_elapsed
 
         return elapsed, duration
 
-    def percentage_elapsed(self, upper=100):
+    def percentage_elapsed(self, upper=100) -> float:
         """
         :type upper: float, int
         :param upper: (optional) scale - returned value is between 0 and upper (default 100)
@@ -374,11 +383,11 @@ class LMSPlayer(LMSUtils):
         try:
             elapsed, duration = self.track_elapsed_and_duration
             return (elapsed / duration) * upper
-        except:
+        except ZeroDivisionError:
             return 0.0
 
     @property
-    def time_elapsed(self):
+    def time_elapsed(self) -> float:
         """
         :rtype: float
         :returns: elapsed time in seconds. Returns 0.0 if an exception is encountered.
@@ -392,19 +401,16 @@ class LMSPlayer(LMSUtils):
         return elapsed
 
     @property
-    def time_remaining(self):
+    def time_remaining(self) -> float:
         """
         :rtype: float
         :returns: remaining time in seconds. Returns 0.0 if an exception is encountered.
 
         """
-        try:
-            return self.track_duration - self.time_elapsed
-        except:
-            return 0.0
+        return self.track_duration - self.time_elapsed
 
     @property
-    def track_count(self):
+    def track_count(self) -> int:
         """
         :rtype: int
         :returns: number of tracks in playlist
@@ -412,19 +418,19 @@ class LMSPlayer(LMSUtils):
         """
         try:
             return int(self.parse_request("playlist tracks ?", "_tracks"))
-        except:
+        except TypeError:
             return 0
 
-    def playlist_play_index(self, index):
+    def playlist_play_index(self, index) -> int:
         """
         :type index: int
         :param index: index of playlist track to play (zero-based index)
 
         """
-        return self.request('playlist index {}'.format(index))
+        return self.request(f"playlist index {index}")
 
     @property
-    def playlist_position(self):
+    def playlist_position(self) -> int:
         """
         :rtype:     int
         :returns: position of current track in playlist
@@ -432,10 +438,10 @@ class LMSPlayer(LMSUtils):
         """
         try:
             return int(self.parse_request("playlist index ?", "_index"))
-        except:
+        except TypeError:
             return 0
 
-    def playlist_get_current_detail(self, amount=None, taglist=None):
+    def playlist_get_current_detail(self, amount=None, taglist=None) -> List:
         """
         :type amount: int
         :param amount: number of tracks to query
@@ -475,7 +481,7 @@ class LMSPlayer(LMSUtils):
                                       amount=amount,
                                       taglist=taglist)
 
-    def playlist_get_detail(self, start=None, amount=None, taglist=None):
+    def playlist_get_detail(self, start=None, amount=None, taglist=None) -> List:
         """
         :type start: int
         :param start: playlist index of first track to query
@@ -508,7 +514,7 @@ class LMSPlayer(LMSUtils):
                                       amount=amount,
                                       taglist=taglist)
 
-    def playlist_get_info(self, taglist=None, start=None, amount=None):
+    def playlist_get_info(self, taglist=None, start=None, amount=None) -> List:
         """
         :type start: int
         :param start: playlist index of first track to query
@@ -533,15 +539,19 @@ class LMSPlayer(LMSUtils):
               u'title': u'Mardy Bum'}]
 
         """
-        """Get info about the tracks in the current playlist"""
+        # Get info about the tracks in the current playlist
         if amount is None:
             amount = self.track_count
 
         if start is None:
             start = 0
 
-        tags = " tags:{}".format(",".join(taglist)) if taglist else ""
-        command = "status {} {} {}".format(start, amount, tags)
+        tags = ""
+        if taglist:
+            tags_str = ','.join(taglist)
+            tags = f"tags:{tags_str}"
+
+        command = f"status {start} {amount} {tags}"
 
         try:
             return self.parse_request(command, "playlist_loop")
@@ -556,8 +566,7 @@ class LMSPlayer(LMSUtils):
         :param item: link to playable item
 
         """
-        # item = self.quote(item)
-        self.request("playlist play {}".format(item))
+        self.request(f"playlist play {item}")
 
     def playlist_add(self, item):
         """
@@ -567,8 +576,7 @@ class LMSPlayer(LMSUtils):
         :param item: link to playable item
 
         """
-        # item = self.quote(item)
-        self.request("playlist add {}".format(item))
+        self.request(f"playlist add {item}")
 
     def playlist_insert(self, item):
         """
@@ -578,8 +586,7 @@ class LMSPlayer(LMSUtils):
         :param item: link to playable item
 
         """
-        # item = self.quote(item)
-        self.request("playlist insert {}".format(item))
+        self.request(f"playlist insert {item}")
 
     def playlist_delete(self, item):
         """
@@ -589,8 +596,7 @@ class LMSPlayer(LMSUtils):
         :param item: link to playable item
 
         """
-        # item = self.quote(item)
-        self.request("playlist deleteitem {}".format(item))
+        self.request(f"playlist deleteitem {item}")
 
     def playlist_clear(self):
         """Clear the entire playlist. Will also stop the player."""
@@ -606,20 +612,20 @@ class LMSPlayer(LMSUtils):
         :param to_index: new playlist position
 
         """
-        self.request("playlist move {} {}" % (from_index, to_index))
+        self.request(f"playlist move {from_index} {to_index}")
 
     def playlist_erase(self, index):
         """
         Remove item from playlist by index
 
-        :type findex: int
+        :type index: int
         :param index: index of item to delete
 
         """
-        self.request("playlist delete {}".format(index))
+        self.request(f"playlist delete {index}")
 
     @property
-    def volume(self):
+    def volume(self) -> int:
         """
         Volume information
 
@@ -638,7 +644,7 @@ class LMSPlayer(LMSUtils):
         """
         try:
             return int(self.parse_request("mixer volume ?", "_volume"))
-        except:
+        except TypeError:
             return 0
 
     @volume.setter
@@ -646,11 +652,9 @@ class LMSPlayer(LMSUtils):
         """Set Player Volume"""
         try:
             volume = int(volume)
-            if volume < 0:
-                volume = 0
-            if volume > 100:
-                volume = 100
-            self.request("mixer volume {}".format(volume))
+            volume = max(0, volume)
+            volume = min(100, volume)
+            self.request(f"mixer volume {volume}")
         except TypeError:
             pass
 
@@ -662,7 +666,7 @@ class LMSPlayer(LMSUtils):
         :param interval: amount to increase volume (default 5)
 
         """
-        self.request("mixer volume +{}".format(interval))
+        self.request(f"mixer volume +{interval}")
 
     def volume_down(self, interval=5):
         """
@@ -672,7 +676,7 @@ class LMSPlayer(LMSUtils):
         :param interval: amount to decrease volume (default 5)
 
         """
-        self.request("mixer volume -{}".format(interval))
+        self.request(f"mixer volume -{interval}")
 
     def sync(self, player=None, ref=None, index=None, master=True):
         """
@@ -720,7 +724,7 @@ class LMSPlayer(LMSUtils):
         """Remove player from syncgroup."""
         self.request("sync -")
 
-    def get_synced_players(self, refs_only=False):
+    def get_synced_players(self, refs_only=False) -> List:
         """
         Retrieve list of players synced to current player.
 
@@ -732,11 +736,9 @@ class LMSPlayer(LMSUtils):
         sync = self.parse_request("sync ?", "_sync")
 
         if str(sync) == "-":
-            return list()
+            return []
 
-        else:
-            if refs_only:
-                return sync.split(",")
+        if refs_only:
+            return sync.split(",")
 
-            else:
-                return [LMSPlayer(ref, self.server) for ref in sync.split(",")]
+        return [LMSPlayer(ref, self.server) for ref in sync.split(",")]
