@@ -198,6 +198,22 @@ class LMSPlayer():
         except TypeError:
             pass
 
+    def play_favorite(self, name):
+        """
+        :type name: str, unicode
+        :param name: string to be found in favorite name, first favorite that matches a substring search will be selected.
+
+        Play a certain favorite on this player.
+        """
+        try:
+            favorites = self.parse_request("favorites items 0 100", "loop_loop")
+            fav_id = next(f for f in favorites if name in f["name"])["id"]
+            self.request("favorites playlist play item_id:{}".format(fav_id))
+        except TypeError:
+            pass
+        except StopIteration:
+            pass
+
     @property
     def name(self) -> str:
         """
